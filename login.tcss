@@ -1,0 +1,110 @@
+#login-form, #signup-form {
+    width: 50;
+    padding: 2 4;
+}
+
+Button {
+    width: 100%;
+    content-align: center middle;
+    text-style: bold;
+}
+
+#login_btn {
+    height: 3;
+    background: $success;
+    color: white;
+    content-align: center middle;
+    margin: 0 1;
+}
+
+#to_signup {
+    height: 3;
+    content-align: center middle;
+    margin: 1 1;
+}
+
+#title {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+Input { margin-bottom: 1; }
+
+#sidebar {
+    width: 30;
+    background: $surface;
+    border-right: solid $primary;
+    padding: 1 2;
+}
+
+#sidebar-title {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+    color: $accent;
+}
+
+#sidebar Button {
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    border: none;
+    text-style: bold;
+    content-align: center middle;
+}
+
+#btn_create, #btn_join {
+    border:tall $primary;
+    text-style: bold;
+}
+
+.spacer-room-btn {
+    height: 0.1;
+}
+
+JoinRoomScreen {
+    align: center middle;
+}
+
+#join_dialog {
+    width: 40;
+    height: 15;
+    border: thick $primary;
+    background: $surface;
+    padding: 1;
+}
+
+#room-id-input {
+    margin: 1 0;
+}
+
+#join-dialog Button {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#rooms-list {
+    height: 1fr;
+    overflow-y: scroll;
+}
+
+.room-link {
+    width: 100%;
+    height: 3;
+    background: transparent;
+    border: none;
+    content-align: left middle;
+    padding-left: 2;
+}
+
+.room-link:hover {
+    background: $primary-muted;
+    text-style: bold;
+}
+
+.empty-msg {
+    color: $text-muted;
+    text-align: center;
+    margin-top: 1;
+}
