@@ -14,7 +14,7 @@ class JoinRoomScreen(ModalScreen):
     def on_button_pressed(self, event):
         if event.button.id == "confirm-join":
             room_id = self.query_one("#room-id-input").value
-            
+
             self.dismiss(room_id)
         else:
             self.dismiss(None)

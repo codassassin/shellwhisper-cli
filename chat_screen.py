@@ -21,7 +21,7 @@ class ChatScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
-            
+
             with Vertical(id="sidebar"):
                 yield Label("SHELLWHISPER", id="sidebar-title")
                 yield Static(classes='spacer')
@@ -34,17 +34,17 @@ class ChatScreen(Screen):
                 yield Label("MY ROOMS", id="section-label")
                 with Vertical(id="rooms-list"):
                     yield LoadingIndicator()
-                
+
                 yield Button("# public-chat", classes="room-link")
 
                 yield Static(classes='spacer')
                 yield Button("Logout", variant="error", id="logout_btn")
-            
+
             with Vertical(id="chat-container"):
                 yield RichLog(id="chat_log", highlight=True, markup=True)
                 yield Input(placeholder="Type a whisper and press Enter...", id="chat_input")
         yield Footer()
-    
+
     async def on_mount(self) -> None:
         rooms = self.fetch_user_rooms()
         rooms_list = self.query_one("#rooms-list")
@@ -74,7 +74,7 @@ class ChatScreen(Screen):
         elif event.button.classes == "room-link":
             room_id = event.button.id.replace("room_", "")
             self.switch_to_room(room_id)
-    
+
     def switch_to_room(self, room_id) -> None:
         self.app.notify(f"Switching to Room: {room_id}")
         self.query_one("#chat_log").clear()
@@ -83,7 +83,7 @@ class ChatScreen(Screen):
     def handle_join(self, room_id: str | None) -> None:
         if room_id:
             self.app.notify(f"Attempting to join: {room_id}")
-    
+
     def on_button_submitted(self, event: Input.Submitted) -> None:
         message = event.value.strip()
 
@@ -91,7 +91,7 @@ class ChatScreen(Screen):
             chat_log = self.query_one("#chat_log", RichLog)
             chat_log.write(f"[bold cyan]You:[/] {message}")
             self.query_one("#chat_input").value = ""
-    
+
     def fetch_user_rooms(self):
         url="http://localhost:8080/api/v1/room/all"
         headers = {"Authorization": f"Bearer {self.app.access_token}"}

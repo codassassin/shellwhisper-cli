@@ -25,7 +25,7 @@ class LoginScreen(Screen):
                     yield Button("Login", variant="success", id="login_btn")
                     yield Button("Need an account? Sign up", variant="default", id="to_signup")
         yield Footer()
-        
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "login_btn":
             username = self.query_one("#username").value
@@ -48,13 +48,13 @@ class LoginScreen(Screen):
                     self.app.notify("Invalid username or password", severity="error")
                 else:
                     self.app.notify(f"Server Error: {response.status_code}", severity="error")
-            
+
             except requests.exceptions.RequestException as e:
                 self.app.notify("Could not connect to ShellWhisper server", severity="error")
 
         elif event.button.id == "to_signup":
             self.app.push_screen(SignupScreen())
-    
+
 class SignupScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back to Login")]
 
@@ -73,7 +73,7 @@ class SignupScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back_btn":
             self.dismiss()
-        
+
         elif event.button.id == "register_btn":
             username = self.query_one("#signup_user").value
             email = self.query_one("#signup_email").value
@@ -83,7 +83,7 @@ class SignupScreen(Screen):
             if not username or not password:
                 self.app.notify("Username and Password required!", severity="error")
                 return
-            
+
             try:
                 payload = {
                     "username": username,
