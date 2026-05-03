@@ -102,10 +102,10 @@ class ChatScreen(Screen):
             if response.status_code == 200:
                 return response.json()
         except Exception as e:
-            self.app.notify("Failed to load rooms with exception {e}", severity="error")
-        
+            self.app.notify(f"Failed to load rooms with exception {e}", severity="error")
+
         return []
-            
+
 
     def action_logout(self) -> None:
         self.logout_process()
@@ -113,7 +113,7 @@ class ChatScreen(Screen):
     def logout_process(self):
         from login import LoginScreen
 
-        self.app.acess_token = None
+        self.app.access_token = None
 
         if hasattr(self.app, 'conn') and self.app.conn.is_connected():
             self.app.conn.disconnect()
