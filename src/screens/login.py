@@ -1,9 +1,9 @@
-from textual.app import App, ComposeResult
+from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Header, Footer, Input, Button, Label
 from textual.containers import Vertical, Center, Middle
 
-from chat_screen import ChatScreen
+from src.screens.chat_screen import ChatScreen
 
 import requests
 

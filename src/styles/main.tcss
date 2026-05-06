@@ -108,3 +108,39 @@ JoinRoomScreen {
     text-align: center;
     margin-top: 1;
 }
+
+#action-buttons {
+    height: auto;
+    align: center middle;
+}
+
+#action-button Button {
+    width: 1fr;
+    margin: 0 1;
+}
+
+RoomActionScreen {
+    align: center middle;
+}
+
+#room-action-dialog {
+    width: 60;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+    align: center middle;
+}
+
+#action-buttons-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1;
+    grid-columns: 1fr 1fr;
+    height: 3;
+    margin: 1 0;
+}
+
+#action-buttons-grid Button {
+    width: 100%;
+}
