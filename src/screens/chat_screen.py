@@ -1,5 +1,3 @@
-import requests
-from textual.app import ComposeResult
 from textual.widgets import Header, Footer, Input, Label, RichLog, Button
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal
@@ -17,23 +15,18 @@ class ChatScreen(Screen):
         ("ctrl+q", "quit", "Quit"),
     ]
 
-    # def compose(self) -> ComposeResult:
-    #     yield Header()
-    #     with Horizontal():
-    #         yield Sidebar(id="sidebar")
-    #         with Vertical(id="chat-container"):
-    #             yield RichLog(id="chat_log", highlight=True, markup=True)
-    #             yield Input(placeholder="Type a whisper and press Enter...", id="chat_input")
-    #     yield Footer()
-
     def compose(self):
-        yield Sidebar(id="sidebar")
-        with Horizontal():
-            yield Label("Select a room to start whispering...", id="empty-view")
+        yield Header()
 
-            with Vertical(id="chat-view"):
-                yield RichLog(id="chat_log", highlight=True, markup=True)
-                yield Input(placeholder="Type a whisper and press Enter...", id="chat_input")
+        with Horizontal():
+            yield Sidebar(id="sidebar")
+
+            with Vertical(id="chat-area"):
+                yield Label("Select a room to start whispering...", id="empty-view")
+
+                with Vertical(id="chat-view"):
+                    yield RichLog(id="chat_log", highlight=True, markup=True)
+                    yield Input(placeholder="Type a whisper and press Enter...", id="chat_input")
 
         yield Footer()
 
@@ -71,19 +64,10 @@ class ChatScreen(Screen):
                 self.app.notify(f"Joining {room_name} with key: {security_string}")
 
     def switch_to_room(self, room_id: str) -> None:
-        # self.app.notify(f"Switching to Room: {room_id}")
-
         self.app.current_room_id = room_id
 
-        chat_view = self.query_one("#chat-view")
-        chat_view.styles.display = "block"
-
-        try:
-            self.query_one("#empty-view").styles.display = "none"
-        except:
-            pass
-
-        # self.app.notify(f"Switched to room {room_id}", severity="success")
+        self.query_one("#chat-view").styles.display = "block"
+        self.query_one("#empty-view").styles.display = "none"
         self.query_one("#chat_log").clear()
         self.fetch_and_display_messages(room_id)
 
@@ -111,8 +95,6 @@ class ChatScreen(Screen):
     def fetch_user_rooms(self):
         try:
             response = self.app.api.fetch_rooms()
-            # client = APIClient(self.app);
-            # response = client.fetch_rooms()
 
             if response.status_code == 200:
                 return response.json()

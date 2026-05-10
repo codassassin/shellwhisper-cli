@@ -180,3 +180,42 @@ RoomActionScreen {
 Screen {
     border: none;
 }
+
+#chat-container {
+    width: 1fr;
+    height: 100%;
+}
+
+#chat-view {
+    display: none;
+    height: 100%;
+}
+
+#chat_log {
+    height: 1fr;
+    background: $surface;
+    border-bottom: solid $primary;
+    padding: 1;
+}
+
+#chat-input {
+    height: 3;
+    margin: 1;
+    border: tall $primary;
+}
+
+#empty-view {
+    width: 1fr;
+    height: 100%;
+    content-align: center middle;
+    color: $text-muted;
+}
+
+#screen-body {
+    height: 1fr;
+}
+
+#chat-area {
+    width: 1fr;
+    height: 100%;
+}
