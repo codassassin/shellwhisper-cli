@@ -1,14 +1,15 @@
 from textual.app import App
 
+from src.screens.chat_screen import ChatScreen
 from src.screens.login import LoginScreen
 from src.utils.api_client import APIClient
 
 class TerminalChatApp(App):
-    # SCREENS = {
-    #     "login": LoginScreen,
-    #     "chat": ChatScreen,
-    #     "signup": SignupScreen
-    # }
+    SCREENS = {
+        "login": LoginScreen,
+        "chat": ChatScreen,
+        # "signup": SignupScreen
+    }
     BINDINGS = [
         ("ctrl+d", "toggle_dark", "Toggle dark mode"),
         ("ctrl+q", "quit", "Quit"),
@@ -22,8 +23,6 @@ class TerminalChatApp(App):
         self.current_user = None
 
     def on_mount(self) -> None:
-        # self.api = APIClient(self)
-        # self.push_screen(ChatScreen())
         self.push_screen(LoginScreen())
 
     def action_logout(self) -> None:

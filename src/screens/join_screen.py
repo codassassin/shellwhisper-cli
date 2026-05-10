@@ -1,6 +1,6 @@
 from textual.screen import ModalScreen
-from textual.containers import Grid
-from textual.widgets import Input, Label, Button
+from textual.containers import Center, Grid, Vertical
+from textual.widgets import Footer, Input, Label, Button
 
 class JoinRoomScreen(ModalScreen):
 
@@ -18,3 +18,6 @@ class JoinRoomScreen(ModalScreen):
             self.dismiss(room_id)
         else:
             self.dismiss(None)
+
+
+

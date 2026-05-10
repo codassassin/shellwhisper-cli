@@ -7,8 +7,8 @@ class Sidebar(Static):
         yield Label("ShellWhisper", id="sidebar-title")
         yield Static(classes='spacer')
 
-        yield Button("🌐 ROOM ACTIONS", variant="primary", id="btn_room_mgmt")
-        yield Button("✉️ PRIVATE WHISPER", variant="warning", id="btn_private")
+        yield Button("🌐 ROOM ACTIONS", id="btn_room_mgmt")
+        yield Button("✉️ PRIVATE WHISPER", id="btn_private")
 
         yield Static(classes='spacer')
         yield Label("MY ROOMS", id="section-label")
@@ -28,7 +28,7 @@ class Sidebar(Static):
         else:
             for room in rooms:
                 btn = Button(
-                    Label=f"#{room['name']}",
+                    label=f"#{room['roomName']}",
                     id=f"room_{room['id']}",
                     classes="room-link"
                 )

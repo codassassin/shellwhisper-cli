@@ -101,3 +101,4 @@ class SignupScreen(Screen):
 
             except requests.exceptions.ConnectionError:
                 self.app.notify("Backend server is not running!", severity="error")
+

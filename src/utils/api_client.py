@@ -13,4 +13,7 @@ class APIClient:
         return requests.post(f"{self.BASE_URL}/auth/login", json={"username": username, "password": password})
     
     def fetch_rooms(self):
-        return requests.get(f"{self.BASE_URL}/room/all", headers=self._get_headers())
+        return requests.get(f"{self.BASE_URL}/room/my-rooms", headers=self._get_headers())
+
+    def fetch_messages(self, room_id: str):
+        return requests.get(f"{self.BASE_URL}/messages/{room_id}", headers=self._get_headers())
