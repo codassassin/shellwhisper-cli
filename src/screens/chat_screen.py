@@ -2,10 +2,15 @@ from textual.widgets import Header, Footer, Input, Label, RichLog, Button
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal
 
+from src.events import NewWhisperReceived
 from src.components.sidebar import Sidebar
 from src.screens.room_action_screen import RoomActionScreen
 from src.screens.security_screen import SecurityScreen
 from src.utils.api_client import APIClient
+
+import json
+
+from datetime import datetime
 
 class ChatScreen(Screen):
     TITLE = "ShellWhisper"
@@ -21,7 +26,7 @@ class ChatScreen(Screen):
         with Horizontal():
             yield Sidebar(id="sidebar")
 
-            with Vertical(id="chat-area"):
+            with Vertical(id="chat-view-container"):
                 yield Label("Select a room to start whispering...", id="empty-view")
 
                 with Vertical(id="chat-view"):
@@ -32,8 +37,12 @@ class ChatScreen(Screen):
 
     async def on_mount(self) -> None:
         self.sub_title = f"Logged in as {self.app.current_user}"
-        rooms = self.fetch_user_rooms()
-        self.call_after_refresh(self.update_sidebar_data, rooms)
+        
+        self.app.connect_websocket()
+        
+        self.rooms = self.fetch_user_rooms()
+        
+        self.call_after_refresh(self.update_sidebar_data, self.rooms)
 
     def update_sidebar_data(self, rooms) -> None:
         sidebar = self.query_one("#sidebar")
@@ -65,6 +74,27 @@ class ChatScreen(Screen):
 
     def switch_to_room(self, room_id: str) -> None:
         self.app.current_room_id = room_id
+        room = next((r for r in self.rooms if r['id'] == room_id), None)
+
+        if not room:
+            self.app.notify("Room details not found", severity="error")
+            return
+
+        # room_name = room['roomName']
+
+        if self.app.stomp_conn and self.app.stomp_conn.sock:
+            subscribe_frame = (
+                f"SUBSCRIBE\n"
+                f"id:{room_id}\n"
+                f"destination:/topic/room/{room_id}\n"
+                f"ack:auto\n\n"
+                f"\x00"
+            )
+            
+            try:
+                self.app.stomp_conn.send(subscribe_frame)
+            except Exception as e:
+                self.app.notify(f"Subscribe failed: {str(e)}", severity="error")
 
         self.query_one("#chat-view").styles.display = "block"
         self.query_one("#empty-view").styles.display = "none"
@@ -80,9 +110,14 @@ class ChatScreen(Screen):
                 chat_log = self.query_one("#chat_log", RichLog)
 
                 for msg in messages:
-                    sender = msg.get("senderUsername", "System")
+                    sender = msg.get("sender", "System")
                     content = msg.get("content", "")
-                    chat_log.write(f"[bold cyan]{sender}:[/] {content}")
+
+                    if sender == self.app.current_user:
+                        chat_log.write(f"[bold cyan]You:[/] {content}")
+                    else:
+                        chat_log.write(f"[bold green]{sender}:[/] {content}")
+
             else:
                 self.app.notify("Failed to load message history", severity="error")
         except Exception as e:
@@ -128,7 +163,34 @@ class ChatScreen(Screen):
         self.app.switch_screen(LoginScreen())
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        message = event.value.strip()
-        if message:
-            self.query_one("#chat_log").write(f"[bold cyan]You:[/] {message}")
-            self.query_one("#chat_input").value = ""
+        message_text = event.value.strip()
+        if message_text and self.app.current_room_id:
+
+            payload = {
+                "sender": self.app.current_user,
+                "content": message_text,
+                "roomId": self.app.current_room_id,
+                "messageTime": datetime.now().isoformat()
+            }
+
+            body = json.dumps(payload)
+            stomp_frame = f"SEND\ndestination:/app/sendMessage\ncontent-type:application/json\n\n{body}\x00"
+
+            if self.app.stomp_conn and self.app.stomp_conn.sock:
+                try:
+                    self.app.stomp_conn.send(stomp_frame)
+                    # self.query_one("#chat_log").write(f"[bold cyan]You:[/] {message_text}")
+                    self.query_one("#chat_input").value = ""
+                except Exception as e:
+                    self.app.notify(f"Failed to send message: {str(e)}", severity="error")
+    
+    def on_new_whisper_received(self, event: NewWhisperReceived) -> None:
+        data = event.data
+        sender = data.get("sender", "Unknown")
+        content = data.get("content", "")
+        chat_log = self.query_one("#chat_log")
+        
+        if sender == self.app.current_user:
+            chat_log.write(f"[bold cyan]You:[/] {content}")
+        else:
+            chat_log.write(f"[bold green]{sender}:[/] {content}")

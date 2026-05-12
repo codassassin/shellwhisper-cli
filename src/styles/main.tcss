@@ -219,3 +219,8 @@ Screen {
     width: 1fr;
     height: 100%;
 }
+
+$deep-bg: #0d0df;
+$panel-bg: #16161e
+$neon-cyan: #00ffff;
+$neon-magenta: #ff00ff
