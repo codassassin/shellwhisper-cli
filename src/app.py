@@ -80,6 +80,14 @@ class TerminalChatApp(App):
                 if "CONNECTED" not in response:
                     raise Exception(f"STOMP handshake failed: {response[:100]}")
 
+                personal_sync_frame = (
+                    f"SUBSCRIBE\n"
+                    f"id:sub-user-sync\n"
+                    f"destination:/user/queue/rooms/refresh\n"
+                    f"ack:auto\n\n\x00"
+                )
+                conn.send(personal_sync_frame)
+
                 delay = 1
                 attempts = 0
                 self.call_from_thread(
@@ -124,6 +132,26 @@ class TerminalChatApp(App):
                     if len(parts) > 1:
                         body_str = parts[1].rstrip('\x00')
                         message_data = json.loads(body_str)
+
+                        if message_data.get("content") == "ROOM_DELETED_SIGNAL":
+                            # deleter = message_data.getattr("sender") if message_data.getattr("sender") != self.app.current_user else "You"
+                            # deleter = self.app.current_user
+                            deleter = message_data.get("sender") if message_data.get("sender") != self.app.current_user else "You"
+                            self.call_from_thread(
+                                self.notify,
+                                f"Active room has been deleted by {deleter}.",
+                                severity="warning"
+                            )
+
+                            if self.current_room_id == message_data.get("roomId"):
+                                self.current_room_id = None
+                                self.file_cache.clear()
+
+                                self.call_from_thread(self.screen._clear_to_empty_viewport)
+
+                            self.call_from_thread(self.screen.refresh_rooms)
+                            continue
+
                         self.call_from_thread(
                             self.screen.post_message, NewWhisperReceived(message_data)
                         )

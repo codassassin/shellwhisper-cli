@@ -8,7 +8,6 @@ from src.events import NewWhisperReceived
 from src.components.sidebar import Sidebar
 from src.screens.room_action_screen import RoomActionScreen
 from src.screens.security_screen import SecurityScreen
-from src.utils.api_client import APIClient
 from src.screens.private_whisper_screen import PrivateWhisperPromptScreen
 
 import json
@@ -37,7 +36,7 @@ class ChatScreen(Screen):
                 with Vertical(id="chat-view"):
                     yield RichLog(id="chat_log", highlight=True, markup=True)
                     yield Input(
-                        placeholder="Type a whisper and press Enter...",
+                        placeholder="Type a whisper or @help for commands...",
                         id="chat_input",
                     )
 
@@ -48,29 +47,25 @@ class ChatScreen(Screen):
         self._current_subscription_id = None
         self.current_room_messages = []
         self._pending_room_data = None
+        self.rooms = []
 
         self.app.connect_websocket()
-
-        # self.rooms = self.fetch_user_rooms()
-        # self.call_after_refresh(self.update_sidebar_data, self.rooms)
+        self.set_interval(5.0, self.refresh_rooms)
         self.run_worker(self._load_rooms_worker, thread=True)
 
+    # --- Sidebar / room loading --- #
+
     def _load_rooms_worker(self) -> None:
-        self.rooms = self.fetch_user_rooms()
-        self.app.call_from_thread(self.update_sidebar_data, self.rooms)
+        rooms = self.fetch_user_rooms()
+        self.rooms = rooms
+        self.app.call_from_thread(self.update_sidebar_data, rooms)
 
     def refresh_rooms(self) -> None:
         self.run_worker(self._load_rooms_worker, thread=True)
-
-    ### SIDEBAR ###
 
     def update_sidebar_data(self, rooms) -> None:
         sidebar = self.query_one("#sidebar")
         self.app.run_worker(sidebar.update_rooms(rooms))
-
-    def refresh_rooms(self) -> None:
-        self.rooms = self.fetch_user_rooms()
-        self.update_sidebar_data(self.rooms)
 
     ### BUTTON HANDLING ###
 
@@ -85,6 +80,8 @@ class ChatScreen(Screen):
             room_id = event.button.id.replace("room_", "")
             self.switch_to_room(room_id)
 
+    # --- Private whisper flow --- #
+
     def _on_private_chat_dismissed(self, target_username: str | None) -> None:
         if not target_username:
             return
@@ -97,15 +94,18 @@ class ChatScreen(Screen):
 
             if response.status_code in (200, 201):
                 room_data = response.json()
-                self.app_call_from_thread(
+
+                self.app.call_from_thread(
                     self.app.notify,
-                    f"Private channel open with {target_username}!",
-                    severity="success"
+                    f"Private channel open with {escape(target_username)}!",
+                    severity="success",
                 )
 
-                self.rooms = self.fetch_user_rooms()
-                self.app.call_from_thread(self.update_sidebar_data, self.rooms)
+                rooms = self.fetch_user_rooms()
+                self.rooms = rooms
+                self.app.call_from_thread(self.update_sidebar_data, rooms)
                 self.app.call_from_thread(self._auto_switch_to_room, room_data.get("id"))
+
             elif response.status_code == 404:
                 self.app.call_from_thread(
                     self.app.notify,
@@ -116,13 +116,13 @@ class ChatScreen(Screen):
                 self.app.call_from_thread(
                     self.app.notify,
                     f"Action failed ({response.status_code}): {escape(response.text)}",
-                    severity="error"
+                    severity="error",
                 )
         except Exception as e:
             self.app.call_from_thread(
                 self.app.notify,
-                f"Network connection failed {escape(str(e))}",
-                severity="error"
+                f"Network error: {escape(str(e))}",
+                severity="error",
             )
 
     ### RoomActionScreen ###
@@ -137,23 +137,18 @@ class ChatScreen(Screen):
             self._on_security_action_dismissed,
         )
 
-    ### Security Screen ###
-
     def _on_security_action_dismissed(self, security_key: str | None) -> None:
         if not security_key or not self._pending_room_data:
             return
 
-        room_name = self._pending_room_data["name"]
         action = self._pending_room_data["action"]
+        room_name = self._pending_room_data["name"]
         self._pending_room_data = None
 
-        try:
-            if action == "create_btn":
-                self._do_create_room(room_name, security_key)
-            else:
-                self._do_join_room(room_name, security_key)
-        except Exception as e:
-            self.app.notify(f"Network error: {escape(str(e))}", severity="error")
+        if action == "create_btn":
+            self._do_create_room(room_name, security_key)
+        elif action == "join_btn":
+            self._do_join_room(room_name, security_key)
 
     ### CREATE ROOM ###
 
@@ -189,7 +184,7 @@ class ChatScreen(Screen):
             self.refresh_rooms()
             self.call_after_refresh(self._auto_switch_to_room, room_data.get("id"))
         elif response.status_code == 401:
-            self.app.notify("Wrong security key - try again.")
+            self.app.notify("Wrong security key - try again.", severity="error")
         elif response.status_code == 404:
             self.app.notify(
                 f"Room '{escape(room_name)}' not found. Check the name and try again.",
@@ -201,6 +196,61 @@ class ChatScreen(Screen):
                 severity="error",
             )
 
+    ### DELETE ROOM ###
+
+    def _do_delete_room(self, room_id: str, security_str: str = "") -> None:
+        room = next((r for r in self.rooms if r["id"] == room_id), None)
+        room_name = room["roomName"] if room else room_id
+
+        try:
+            response = self.app.api.delete_room(room_id, security_str)
+
+            if response.status_code == 200:
+                # self.app.notify(f"Room '{escape(room_name)}' deleted successfully.", severity="success")
+                self._stomp_unsubscribe()
+                self.app.current_room_id = None
+                self.current_room_messages = []
+                self.app.file_cache.clear()
+                self._clear_to_empty_viewport()
+                self.refresh_rooms()
+            elif response.status_code == 403:
+                self.app.notify("You don't have permission to delete this room.", severity="error")
+            elif response.status_code == 404:
+                self.app.notify("Room not found.", severity="error")
+            else:
+                self.app.notify(
+                    f"Failed to delete room ({response.status_code}): {escape(response.text)}",
+                    severity="error"
+                )
+        except Exception as e:
+            self.app.notify(f"Network error: {escape(str(e))}", severity="error")
+
+    ### LEAVE ROOM ###
+
+    def _do_leave_room(self, room_id: str) -> None:
+        room = next((r for r in self.rooms if r["id"] == room_id), None)
+        room_name = room["roomName"] if room else room_id
+
+        try:
+            response = self.app.api.leave_room(room_id)
+
+            if response.status_code == 200:
+                self.app.notify(f"Left '{escape(room_name)}'.", severity="success")
+                self._stomp_unsubscribe()
+                self.app.current_room_id = None
+                self.current_room_messages = []
+                self.app.file_cache.clear()
+                self._clear_to_empty_viewport()
+                self.refresh_rooms()
+            elif response.status_code == 404:
+                self.app.notify("Room not found.", severity="error")
+            else:
+                self.app.notify(
+                    f"Failed to leave room ({response.status_code}):  "
+                )
+        except Exception as e:
+            self.app.notify(f"Network error: {escape(str(e))}", severity="error")
+
     ### AUTO SWITCH ROOM ###
 
     def _auto_switch_to_room(self, room_id: str | None) -> None:
@@ -211,7 +261,8 @@ class ChatScreen(Screen):
         if room:
             self.switch_to_room(room_id)
         else:
-            self.rooms = self.fetch_user_rooms()
+            rooms = self.fetch_user_rooms()
+            self.rooms = rooms
             self.call_after_refresh(self.switch_to_room, room_id)
 
     ### ROOM SWITCHING ###
@@ -235,9 +286,9 @@ class ChatScreen(Screen):
         self.query_one("#empty-view").styles.display = "none"
         self.query_one("#chat_log").clear()
 
-        self.run_worker(lambda: self.fetch_and_display_messages_worker(room_id), thread=True)
+        self.run_worker(lambda: self._fetch_messages_worker(room_id), thread=True)
 
-    def fetch_and_display_messages_worker(self, room_id: str) -> None:
+    def _fetch_messages_worker(self, room_id: str) -> None:
         try:
             response = self.app.api.fetch_messages(room_id)
 
@@ -247,15 +298,24 @@ class ChatScreen(Screen):
 
                 self.app.call_from_thread(self._render_messages, messages)
             else:
-                self.app.call_from_thread(self.app.notify, f"Failed to load message history", severity="error")
+                self.app.call_from_thread(
+                    self.app.notify,
+                    f"Failed to load message history",
+                    severity="error"
+                )
         except Exception as e:
-            self.app.call_from_thread(self.app.notify, f"Error fetching messages: {escape(str(e))}", severity="error")
+            self.app.call_from_thread(
+                self.app.notify,
+                f"Error fetching messages: {escape(str(e))}",
+                severity="error"
+            )
 
     def _render_messages(self, messages: list) -> None:
         chat_log = self.query_one("#chat_log", RichLog)
         for msg in messages:
             self._write_message(chat_log, msg)
 
+    # --- STOMP Subscribe / Unsubscribe --- #
 
     def _stomp_subscribe(self, room_id: str) -> None:
         if self.app.stomp_conn and self.app.stomp_conn.sock:
@@ -269,7 +329,10 @@ class ChatScreen(Screen):
             try:
                 self.app.stomp_conn.send(subscribe_frame)
             except Exception as e:
-                self.app.notify(f"Subscribe failed: {escape(str(e))}", severity="error")
+                self.app.notify(
+                    f"Subscribe failed: {escape(str(e))}",
+                    severity="error",
+                )
 
     def _stomp_unsubscribe(self) -> None:
         if self._current_subscription_id and self.app.stomp_conn and self.app.stomp_conn.sock:
@@ -293,22 +356,6 @@ class ChatScreen(Screen):
             pass
 
     ### MESSAGE DISPLAY ###
-
-    def fetch_and_display_messages(self, room_id: str) -> None:
-        try:
-            response = self.app.api.fetch_messages(room_id)
-            if response.status_code == 200:
-                messages = response.json()
-                self.current_room_messages = messages
-
-                chat_log = self.query_one("#chat_log", RichLog)
-
-                for msg in messages:
-                    self._write_message(chat_log, msg)
-            else:
-                self.app.notify("Failed to load message history", severity="error")
-        except Exception as e:
-            self.app.notify(f"Error fetching messages: {escape(str(e))}", severity="error")
 
     def _write_message(self, chat_log: RichLog, msg: dict) -> None:
         sender = msg.get("sender", "System")
@@ -363,6 +410,17 @@ class ChatScreen(Screen):
         else:
             chat_log.write(f"[bold green]{safe_sender}:[/]{ts_str} {display_content}")
 
+    ### CLEAR VIEWPORT ###
+
+    def _clear_to_empty_viewport(self) -> None:
+        try:
+            self.query_one("#chat-view").styles.display = "none"
+            self.query_one("#empty-view").styles.display = "block"
+            self.query_one("#chat_log").clear()
+            self.current_room_messages = []
+        except Exception:
+            pass
+
     ### DATA FETCHERS ###
 
     def fetch_user_rooms(self) -> list:
@@ -371,9 +429,15 @@ class ChatScreen(Screen):
             if response.status_code == 200:
                 return response.json()
             else:
-                self.app.notify(f"Failed to load rooms ({response.status_code})", severity="error")
+                self.app.notify(
+                    f"Failed to load rooms ({response.status_code})",
+                    severity="error",
+                )
         except Exception as e:
-            self.app.notify(f"Failed to load rooms {escape(str(e))}", severity="error")
+            self.app.notify(
+                f"Failed to load rooms {escape(str(e))}",
+                severity="error",
+            )
 
         return []
 
@@ -387,7 +451,7 @@ class ChatScreen(Screen):
             return
 
         if raw.lower() == "@help":
-            self._handle_command(raw)
+            self._show_help()
             return
 
         if not self.app.current_room_id:
@@ -398,6 +462,26 @@ class ChatScreen(Screen):
             self._handle_command(raw)
         else:
             self._send_message(raw)
+
+    def _show_help(self) -> None:
+        try:
+            chat_log = self.query_one("#chat_log", RichLog)
+            if self.query_one("#chat_log").styles.display == "none":
+                raise Exception("chat not visible")
+        except Exception:
+            self.app.notify(
+                "@copy:/path send file | @get:name download | @delete delete room | @leave leave room",
+                severity="information"
+            )
+            return
+
+        chat_log.write("[bold yellow]-- ShellWhisper Commands --[/]")
+        chat_log.write(" [cyan]@copy:/path/to/file[/]  send any file to this room")
+        chat_log.write(" [cyan]@get:filename[/]        download a file from room history")
+        chat_log.write(" [cyan]@save:filename[/]       alias for @get")
+        chat_log.write(" [cyan]@delete[/]              delete the current room")
+        chat_log.write(" [cyan]@leave[/]               leave the current room")
+        chat_log.write(" [cyan]@help[/]                show this message")
 
     def _handle_command(self, raw: str) -> None:
         chat_log = self.query_one("#chat_log", RichLog)
@@ -456,12 +540,38 @@ class ChatScreen(Screen):
             if not found:
                 self.app.notify(f"File '{escape(target)}' not found in whispers", severity="warning")
 
+        elif raw.lower() == "@delete":
+            room_id = self.app.current_room_id
+            if not room_id:
+                self.app.notify("Select an active room first.", severity="warning")
+                return
+
+            room = next((r for r in self.rooms if r["id"] == self.app.current_room_id), None)
+            if not room:
+                return
+
+            if room.get("type") == "PRIVATE":
+                self._do_delete_room(room_id, "")
+            else:
+                self._pending_room_data = {
+                    "name": room["roomName"],
+                    "action": "chat_command_delete",
+                    "id": room_id
+                }
+                self.app.push_screen(
+                    SecurityScreen(action="chat_command_delete", room_name=room["roomName"]),
+                    self._on_delete_security_dismissed,
+                )
+
+        elif raw.lower() == "@leave":
+            room_id = self.app.current_room_id
+            if not room_id:
+                self.app.notify("No active room selected.", severity="warning")
+                return
+            self._do_leave_room(room_id)
+
         elif raw.lower() == "@help":
-            chat_log.write("[bold yellow]Available commands:[/]")
-            chat_log.write(" [cyan]@copy:/path/to/file[/] - send a file")
-            chat_log.write(" [cyan]@get:filename[/]       - download a file from history")
-            chat_log.write(" [cyan]@save:filename[/]      - alias for @get")
-            chat_log.write(" [cyan]@help[/]               - show this help message")
+            self._show_help()
 
         else:
             self.app.notify(
@@ -469,14 +579,33 @@ class ChatScreen(Screen):
                 severity="warning",
             )
 
-    def _send_message(self, message_text: str, filename: str = None, is_file: bool = False) -> None:
+    def _on_delete_security_dismissed(self, security_key: str | None) -> None:
+        if not security_key or not self._pending_room_data:
+            return
+
+        room_id = self._pending_room_data.get("id")
+        self._pending_room_data = None
+
+        if room_id:
+            self._do_delete_room(room_id, security_key)
+
+    def _on_chat_command_security_dismissed(self, security_key: str | None) -> None:
+        if not security_key or not self._pending_room_data:
+            return
+
+        action = self._pending_room_data["action"]
+        room_id = self._pending_room_data.get("id")
+        self._pending_room_data = None
+
+        if action == "chat_command_delete" and room_id:
+            self._do_delete_room(room_id, security_key)
+
+    def _send_message(self, message_text: str) -> None:
         payload = {
             "sender": self.app.current_user,
             "content": message_text,
             "roomId": self.app.current_room_id,
             "messageTime": datetime.now().isoformat(),
-            "fileName": filename,
-            "isFile": is_file
         }
 
         frame = (
@@ -490,9 +619,15 @@ class ChatScreen(Screen):
             try:
                 self.app.stomp_conn.send(frame)
             except Exception as e:
-                self.app.notify(f"Failed to send message: {escape(str(e))}", severity="error")
+                self.app.notify(
+                    f"Failed to send message: {escape(str(e))}",
+                    severity="error"
+                )
         else:
-            self.app.notify("Not connected - message not sent.", severity="error")
+            self.app.notify(
+                f"Not connected - message not sent.",
+                severity="error"
+            )
 
     ### INCOMING REAL-TIME MESSAGES ###
 
@@ -507,7 +642,7 @@ class ChatScreen(Screen):
     def action_logout(self) -> None:
         self.logout_process()
 
-    def logout_process(self):
+    def logout_process(self) -> None:
         from src.screens.login import LoginScreen
 
         self._stomp_unsubscribe()

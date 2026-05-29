@@ -9,13 +9,6 @@ class APIClient:
     def _get_headers(self):
         return {"Authorization": f"Bearer {self.app.access_token}"}
 
-    def start_private_chat(self, target_username: str):
-        return requests.post(
-            f"{self.BASE_URL}/room/private/{target_username}",
-            headers=self._get_headers(),
-            timeout=5,
-        )
-
     def login(self, username: str, password: str):
         return requests.post(
             f"{self.BASE_URL}/auth/login",
@@ -56,6 +49,28 @@ class APIClient:
         return requests.post(
             f"{self.BASE_URL}/room/join",
             json={"roomName": room_name, "rawSecurityString": security_string},
+            headers=self._get_headers(),
+            timeout=5,
+        )
+
+    def delete_room(self, room_id: str, security_key: str = ""):
+        return requests.delete(
+            f"{self.BASE_URL}/room/delete/{room_id}",
+            params={"securityKey": security_key},
+            headers=self._get_headers(),
+            timeout=5,
+        )
+
+    def leave_room(self, room_id: str):
+        return requests.delete(
+            f"{self.BASE_URL}/room/{room_id}/leave",
+            headers=self._get_headers(),
+            timeout=10,
+        )
+
+    def start_private_chat(self, target_username: str):
+        return requests.post(
+            f"{self.BASE_URL}/room/private/{target_username}",
             headers=self._get_headers(),
             timeout=5,
         )

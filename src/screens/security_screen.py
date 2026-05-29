@@ -15,6 +15,11 @@ class SecurityScreen(ModalScreen):
             hint = "Others will need key to join."
             btn_label = "Create Room"
             btn_variant = "success"
+        elif self.action == "chat_command_delete":
+            title = f"Confirm Deletion of '{self.room_name}'"
+            hint = "Enter the room security key to permanently delete this room."
+            btn_label = "Delete Room"
+            btn_variant = "error"
         else:
             title = f"Enter Security Key for '{self.room_name}'"
             hint = "The key set by the room creator."
@@ -34,7 +39,7 @@ class SecurityScreen(ModalScreen):
         elif event.button.id == "auth_btn":
             val = self.query_one("#security-input").value.strip()
             if not val:
-                self.app.notify("Security key cannot be enpty.", severity="error")
+                self.app.notify("Security key cannot be empty.", severity="error")
                 return
             self.dismiss(val)
 
