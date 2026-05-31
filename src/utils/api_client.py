@@ -3,8 +3,17 @@ import os
 
 class APIClient:
     # BASE_URL = "http://localhost:8080/api/v1"
-    BASE_URL = os.getenv("SHELLWHISPER_API_URL", "http://localhost:8080/api/v1")
-    WS_URL = os.getenv("SHELLWHISPER_WS_URL", "ws://127.0.0.1:8080/chat/websocket")
+    # BASE_URL = os.getenv(
+    #     "SHELLWHISPER_API_URL",
+    #     "https://shellwhisper-server.onrender.com/api/v1"
+    # )
+    # WS_URL = os.getenv(
+    #     "SHELLWHISPER_WS_URL",
+    #     "wss://shellwhisper-server.onrender.com/chat/websocket"
+    # )
+
+    BASE_URL = "https://shellwhisper-server.onrender.com/api/v1"
+    WS_URL = "wss://shellwhisper-server.onrender.com/chat/websocket"
 
     def __init__(self, app):
         self.app = app
