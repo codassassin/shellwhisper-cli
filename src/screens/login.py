@@ -24,6 +24,7 @@ class LoginScreen(Screen):
                     yield Input(placeholder="Password", password=True, id="password")
                     yield Button("Login", variant="success", id="login_btn")
                     yield Button("Need an account? Sign up", variant="default", id="to_signup")
+                    yield Button("Forgot Password?", variant="default", id="forgot_pass_btn")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -33,20 +34,20 @@ class LoginScreen(Screen):
 
             try:
                 response = self.app.api.login(username, password)
-                # response = requests.post(
-                #     "http://localhost:8080/api/v1/auth/login",
-                #     json={"username": username, "password": password},
-                #     timeout=5
-                # )
 
                 if response.status_code == 200:
                     data = response.json()
                     self.app.access_token = data.get("token")
+
+                    self.app.refresh_token = data.get("refreshToken")
+
                     self.app.current_user = username
                     self.app.notify(f"Welcome, {username}!", severity="success")
                     self.app.switch_screen(ChatScreen())
+
                 elif response.status_code == 401:
                     self.app.notify("Invalid username or password", severity="error")
+
                 else:
                     self.app.notify(f"Server Error: {response.status_code}", severity="error")
 
@@ -55,6 +56,10 @@ class LoginScreen(Screen):
 
         elif event.button.id == "to_signup":
             self.app.push_screen(SignupScreen())
+
+        elif event.button.id == "forgot_pass_btn":
+            from src.screens.forgot_password import ForgotPasswordScreen
+            self.app.push_screen(ForgotPasswordScreen())
 
 class SignupScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back to Login")]

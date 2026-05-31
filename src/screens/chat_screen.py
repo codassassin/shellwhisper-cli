@@ -324,7 +324,8 @@ class ChatScreen(Screen):
                 f"SUBSCRIBE\n"
                 f"id:sub-{room_id}\n"
                 f"destination:/topic/room/{room_id}\n"
-                f"ack:auto\n\n\x00"
+                f"ack:auto\n"
+                f"Authorization:Bearer {self.app.access_token}\n\n\x00"
             )
             try:
                 self.app.stomp_conn.send(subscribe_frame)
@@ -509,7 +510,7 @@ class ChatScreen(Screen):
                 size_kb = round(len(binary_data) / 1024, 1)
 
                 chat_log.write(f"[dim]Sending:[/] [bold]{escape(filename)}[/] [dim]({size_kb} KB)[/]")
-                self._send_message(f"FILE:{filename}:{encoded}", filename=filename, is_file=True)
+                self._send_message(f"FILE:{filename}:{encoded}")
 
             except Exception as e:
                 self.app.notify(f"@copy failed: {escape(str(e))}", severity="error")
@@ -560,7 +561,7 @@ class ChatScreen(Screen):
                 }
                 self.app.push_screen(
                     SecurityScreen(action="chat_command_delete", room_name=room["roomName"]),
-                    self._on_delete_security_dismissed,
+                    self._on_chat_command_security_dismissed,
                 )
 
         elif raw.lower() == "@leave":
@@ -608,11 +609,15 @@ class ChatScreen(Screen):
             "messageTime": datetime.now().isoformat(),
         }
 
+        payload_str = json.dumps(payload)
+        byte_length = len(payload_str.encode('utf-8'))
+
         frame = (
             f"SEND\n"
             f"destination:/app/sendMessage\n"
-            f"content-type:application/json\n\n"
-            f"{json.dumps(payload)}\x00"
+            f"content-type:application/json\n"
+            f"content-length:{byte_length}\n\n"
+            f"{payload_str}\x00"
         )
 
         if self.app.stomp_conn and self.app.stomp_conn.sock:

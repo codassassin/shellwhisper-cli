@@ -38,15 +38,26 @@ class TerminalChatApp(App):
         self.push_screen(LoginScreen())
 
     def action_logout(self) -> None:
+        self.logout_process()
+
+    def logout_process(self) -> None:
+        from src.screens.login import LoginScreen
+
+        try:
+            self.api.logout_backend()
+        except Exception:
+            pass
+
         self._disconnect_websocket()
         self.access_token = None
+        self.refresh_token = None
         self.current_user = None
         self.current_room_id = None
         self.file_cache.clear()
-        self.switch_screen(LoginScreen())
-        self.notify("Logged out successfully", severity="information")
 
-        ### WebSocket / STOMP ###
+        self.notify("Logged out successfully", severity="information")
+        self.switch_screen(LoginScreen())
+
 
     ### WEBSOCKET / STOMP ###
 
@@ -84,9 +95,20 @@ class TerminalChatApp(App):
                     f"SUBSCRIBE\n"
                     f"id:sub-user-sync\n"
                     f"destination:/user/queue/rooms/refresh\n"
-                    f"ack:auto\n\n\x00"
+                    f"ack:auto\n"
+                    f"Authorization:Bearer {self.access_token}\n\n\x00"
                 )
                 conn.send(personal_sync_frame)
+
+                if getattr(self, 'current_room_id', None):
+                    restore_frame = (
+                        f"SUBSCRIBE\n"
+                        f"id:sub-{self.current_room_id}\n"
+                        f"destination:/topic/room/{self.current_room_id}\n"
+                        f"ack:auto\n"
+                        f"Authorization:Bearer {self.access_token}\n\n\x00"
+                    )
+                    conn.send(restore_frame)
 
                 delay = 1
                 attempts = 0
@@ -94,7 +116,9 @@ class TerminalChatApp(App):
                     self.notify, "Connected to ShellWhisper signal", severity="information"
                 )
 
-                self._listen_for_messages()
+                loop_should_continue = self._listen_for_messages()
+                if loop_should_continue is False:
+                    raise Exception("Broker explicitly rejected the subscription session.")
 
             except Exception as e:
                 error_detail = f"{type(e).__name__}: {e}"
@@ -126,36 +150,63 @@ class TerminalChatApp(App):
         while self.stomp_conn and self.stomp_conn.sock:
             try:
                 raw_data = self.stomp_conn.recv()
+                if not raw_data:
+                    continue
+
+                if isinstance(raw_data, bytes):
+                    if "ExecutorSubscribableChannel" in raw_data:
+                        self.call_from_thread(
+                            self.notify,
+                            "Authentication Interceptor Refused Room Subscription.",
+                            severity="error"
+                        )
+                        return False
+
+                if raw_data.startswith("ERROR"):
+                    self.call_from_thread(self.notify, f"Broker Error: {raw_data[:200]}", severity="error")
 
                 if "MESSAGE" in raw_data:
-                    parts = raw_data.split('\n\n', 1)
+                    normalized_data = raw_data.replace('\r\n', '\n')
+                    parts = normalized_data.split('\n\n', 1)
+
                     if len(parts) > 1:
                         body_str = parts[1].rstrip('\x00')
-                        message_data = json.loads(body_str)
 
-                        if message_data.get("content") == "ROOM_DELETED_SIGNAL":
-                            # deleter = message_data.getattr("sender") if message_data.getattr("sender") != self.app.current_user else "You"
-                            # deleter = self.app.current_user
-                            deleter = message_data.get("sender") if message_data.get("sender") != self.app.current_user else "You"
+                        try:
+                            if not body_str.strip():
+                                continue
+
+                            message_data = json.loads(body_str)
+
+                            if message_data.get("content") == "ROOM_DELETED_SIGNAL":
+                                sender_name = message_data.get("sender")
+                                deleter = sender_name if sender_name != self.current_user else "You"
+
+                                self.call_from_thread(
+                                    self.notify,
+                                    f"Active room has been deleted by {deleter}.",
+                                    severity="warning"
+                                )
+
+                                if self.current_room_id == message_data.get("roomId"):
+                                    self.current_room_id = None
+                                    self.file_cache.clear()
+                                    self.call_from_thread(self.screen._clear_to_empty_viewport)
+
+                                self.call_from_thread(self.screen.refresh_rooms)
+                                continue
+
                             self.call_from_thread(
-                                self.notify,
-                                f"Active room has been deleted by {deleter}.",
-                                severity="warning"
+                                self.screen.post_message, NewWhisperReceived(message_data)
                             )
-
-                            if self.current_room_id == message_data.get("roomId"):
-                                self.current_room_id = None
-                                self.file_cache.clear()
-
-                                self.call_from_thread(self.screen._clear_to_empty_viewport)
-
-                            self.call_from_thread(self.screen.refresh_rooms)
-                            continue
-
-                        self.call_from_thread(
-                            self.screen.post_message, NewWhisperReceived(message_data)
-                        )
-            except Exception:
+                        except json.JSONDecodeError as json_err:
+                            self.call_from_thread(self.notify, f"JSON Error: {json_err}", severity="error")
+                        except Exception as inner_err:
+                            self.call_from_thread(self.notify, f"Event Error: {inner_err}", severity="error")
+                else:
+                    self.call_from_thread(self.notify, f"Malformed Frame Received: {raw_data[:100]}", severity="error")
+            except Exception as ws_err:
+                self.call_from_thread(self.notify, f"WebSocket crashed: {ws_err}", severity="error")
                 break
 
     def _disconnect_websocket(self):
