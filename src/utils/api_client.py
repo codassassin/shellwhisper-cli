@@ -131,4 +131,3 @@ class APIClient:
             json={"email": email, "token": token, "newPassword": new_password},
             timeout=5,
         )
-
