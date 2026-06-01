@@ -1,0 +1,19 @@
+📜 The ShellWhisper Public License (SWPL)
+Version 1.0, May 2026
+
+Copyright (c) 2026 Souvik Chatterjee (codassassin)
+
+1. Purpose
+The ShellWhisper Public License is designed to foster a community of terminal-centric developers while ensuring the core architectural integrity of the ShellWhisper (SW) messaging ecosystem remains open and credited.
+
+2. Grant of Rights
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including the rights to use, copy, modify, merge, publish, and distribute copies of the Software, provided that the original author is credited as the primary architect.
+
+3. Architectural Integrity
+Any derivative works or forks of this Software that utilize the Deterministic Room ID Strategy (alphabetical sorting of member usernames for private room creation) or the TUI-first (Terminal User Interface) methodology must include a prominent reference to the original ShellWhisper project in their documentation.
+
+4. Professional Usage
+While this software was developed with the Fedora Workstation and Spring Boot/MongoDB stack in mind, it is licensed for cross-platform deployment. However, the use of this software within enterprise network automation environments must comply with standard security auditing practices as defined by the user's local jurisdiction.
+
+5. Liability & Warranty
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. THE AUTHOR SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE OR ITS CAPABILITIES IN REAL-TIME MESSAGING ENVIRONMENTS.
