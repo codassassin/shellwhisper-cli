@@ -99,14 +99,14 @@ class APIClient:
         return requests.post(
             f"{self.BASE_URL}/auth/login",
             json={"username": username, "password": password},
-            timeout=5,
+            timeout=45,
         )
 
     def signup(self, username: str, email: str, password: str):
         return requests.post(
             f"{self.BASE_URL}/auth/signup",
             json={"username": username, "email": email, "password": password},
-            timeout=5,
+            timeout=45,
         )
 
     def logout_backend(self):
