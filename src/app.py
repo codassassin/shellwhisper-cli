@@ -73,7 +73,8 @@ class TerminalChatApp(App):
         while self._ws_reconnect and attempts < self._ws_max_retries:
             conn = None
             try:
-                ws_url = "ws://127.0.0.1:8080/chat/websocket"
+                # ws_url = "ws://127.0.0.1:8080/chat/websocket"
+                ws_url = self.api.WS_URL
                 headers = [f"Authorization: Bearer {self.access_token}"]
 
                 conn = websocket.create_connection(ws_url, header=headers)
